@@ -56,7 +56,7 @@ class Handler(BaseHTTPRequestHandler):
   except Exception:self.send(500,{'error':'Ошибка сервера. Проверьте доступ к базе данных.'})
  def get(self):
   path=urlsplit(self.path).path;s=self.identity()
-  if path=='/assets/style.css':return self.send(200,(ROOT/'style.css').read_bytes(),'text/css; charset=utf-8')
+  if path in ('/assets/style.css','/assets/controls.css'):return self.send(200,(ROOT/path.rsplit('/',1)[1]).read_bytes(),'text/css; charset=utf-8')
   if path in ('/','/teacher','/student'):return self.send(200,(ROOT/'webapp/portal.html').read_bytes(),'text/html; charset=utf-8')
   if not s:return self.send(401,{'error':'Откройте персональную ссылку или войдите как учитель.'})
   with connection() as c:

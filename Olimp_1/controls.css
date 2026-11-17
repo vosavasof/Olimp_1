@@ -1,0 +1,51 @@
+/* Shared action controls for the portal and every lesson. */
+:root{--control-height:46px;--control-radius:10px;--control-text:14px}
+button.primary,button.secondary,button.quiet,.lesson-tabs button,.mobile-course-toggle,.portal-main .workspace-nav button{
+ box-sizing:border-box;min-height:var(--control-height);padding:11px 16px;border-radius:var(--control-radius);font-size:var(--control-text);font-weight:600;line-height:22px;vertical-align:middle;white-space:normal;overflow-wrap:anywhere;margin-block:0;
+}
+button.primary,button.secondary,button.quiet{height:auto;border-width:1px;border-style:solid}
+button.quiet{border-color:#d9e2d4}
+.row{align-items:stretch;gap:10px}
+.row>button.primary,.row>button.secondary,.row>button.quiet{flex:1 1 180px;display:flex;justify-content:center;align-items:center}
+.demo-controls>button{flex:1 1 130px;display:flex;align-items:center;justify-content:center}
+.demo-inputs>button{min-height:var(--control-height)}
+.lesson-tabs{align-items:stretch}.lesson-tabs button{flex:1 1 160px;display:flex;align-items:center;justify-content:center}
+.command-bank{align-items:stretch;grid-auto-rows:1fr}.command-bank button.command{height:100%;min-height:var(--control-height);font-size:13px;line-height:1.7;padding:11px 14px}
+.assembly-list button.assembly-slot{min-height:var(--control-height);padding:10px 12px;line-height:1.7;border-width:2px;border-style:solid;border-color:#d5e1cb}
+.assembly-list button.assembly-slot.target{border-color:#507c42}
+select{min-height:var(--control-height);line-height:22px;padding:11px 38px 11px 12px;font-family:inherit;font-size:var(--control-text);border-radius:var(--control-radius);vertical-align:middle}
+input:not([type=checkbox]):not([type=radio]):not([type=range]){min-height:var(--control-height);line-height:22px;padding:11px 12px;border-radius:var(--control-radius)}
+/* Focus stays inside its control; expanded sections remain in document flow. */
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible,.lesson-tabs button:focus-visible,.tower:focus-visible,.code-slot:focus-visible{
+ outline:none;box-shadow:inset 0 0 0 2px #377c59;
+}
+select:focus,summary:focus{outline:none;box-shadow:inset 0 0 0 2px #377c59}
+summary{position:relative;inset:auto;z-index:auto;isolation:isolate;min-height:var(--control-height);height:auto;line-height:1.6;white-space:normal;overflow-wrap:anywhere;list-style:none;user-select:none;-webkit-user-select:none;border-radius:var(--control-radius);gap:10px}
+summary::-webkit-details-marker{display:none}summary::marker{content:''}
+summary::selection,summary *::selection{background:transparent;color:inherit}
+details{position:static;overflow:visible}details>summary::after{position:static!important;inset:auto!important;transform:none!important;align-self:center;line-height:1.2!important;pointer-events:none}
+details>summary+*{margin-top:16px}
+.topic-menu>summary{padding:12px;min-height:54px}.topic-menu>summary strong{min-width:0}.topic-menu>summary::after{flex:0 0 auto}
+.portal-main details>summary{padding:11px 14px;background:#f2f7ec;border:1px solid #dce7d3;color:#34583e}
+.portal-main .workspace-nav{position:static;align-items:stretch}
+.portal-main .workspace-nav>button,.portal-main #teacherViews>button{height:var(--control-height);min-height:var(--control-height);padding:0 16px;font-size:var(--control-text);line-height:1.2}
+.portal-main .variant-toolbar{height:var(--control-height);min-height:var(--control-height);padding:0;background:none;gap:6px}
+.portal-main .variant-toolbar button{height:var(--control-height);min-height:var(--control-height);padding:0 12px;line-height:1.2;border:1px solid #d5dfcf;background:#fff;font-size:var(--control-text)}
+.portal-main .variant-toolbar button[aria-pressed=true]{background:#e7f2df;border-color:#60916c;box-shadow:inset 0 0 0 1px #60916c;color:#285d3b}
+.portal-main .workspace-nav #logout{height:var(--control-height);min-height:var(--control-height)}
+.cohort-grid{grid-auto-rows:1fr}.cohort-chip{height:100%;min-height:120px;border-width:2px}.cohort-chip.selected{border-width:2px}
+@media(max-width:700px){
+ .portal-main .workspace-nav>button,.portal-main #teacherViews>button{height:52px;min-height:52px;padding:0 9px!important;font-size:13px}
+ .portal-main .variant-toolbar,.portal-main .variant-toolbar button,.portal-main .workspace-nav #logout{height:52px;min-height:52px}
+ .portal-main .variant-toolbar button{padding:0 5px!important;font-size:13px}
+ .lesson-tabs button{flex-basis:auto;min-height:46px}.row>button.primary,.row>button.secondary,.row>button.quiet{flex-basis:130px}
+ .demo-controls>button{flex-basis:115px}.demo-controls label{display:flex;align-items:center;gap:8px;width:100%;flex-wrap:wrap}
+ .cohort-chip{min-height:125px}
+}
+/* Equal rows also when captions wrap or actions move to a new line. */
+.row:has(>button):not(:has(>input,>select,>label)){display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));grid-auto-rows:1fr;align-items:stretch}
+.row>button.primary,.row>button.secondary,.row>button.quiet{overflow-wrap:normal;word-break:normal}
+.demo-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));align-items:stretch;grid-auto-rows:minmax(46px,auto)}
+.demo-controls>button{height:100%;overflow-wrap:normal;word-break:normal}
+.demo-controls>label,.demo-controls>#demoCounter{grid-column:1/-1;align-self:center}
+@media(max-width:700px){.row:has(>button):not(:has(>input,>select,>label)){grid-template-columns:1fr;grid-auto-rows:minmax(46px,auto)}.demo-controls{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr}.demo-controls>button{padding:10px 8px;font-size:13px}.demo-controls>label{margin:0;min-height:46px}}
