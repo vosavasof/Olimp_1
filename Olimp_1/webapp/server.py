@@ -15,6 +15,7 @@ def init():
   c.executescript('''CREATE TABLE IF NOT EXISTS students(id INTEGER PRIMARY KEY,name TEXT NOT NULL,token TEXT UNIQUE NOT NULL,variant INTEGER NOT NULL,active INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS lessons(student INTEGER,lesson INTEGER,PRIMARY KEY(student,lesson));
 CREATE TABLE IF NOT EXISTS theory(student INTEGER,topic INTEGER,text TEXT,PRIMARY KEY(student,topic));
+CREATE TABLE IF NOT EXISTS materials(lesson INTEGER PRIMARY KEY,text TEXT NOT NULL,updated INTEGER);
 CREATE TABLE IF NOT EXISTS attempts(id INTEGER PRIMARY KEY,student INTEGER,lesson INTEGER,answer TEXT,correct INTEGER,created INTEGER);''')
 class Handler(BaseHTTPRequestHandler):
  def log_message(self,format,*args):pass # Do not log personal URLs or cookie values.
@@ -37,9 +38,19 @@ class Handler(BaseHTTPRequestHandler):
   except Exception:self.send(500,{'error':'Ошибка сервера. Проверьте доступ к базе данных.'})
  def get(self):
   path=urlsplit(self.path).path;s=self.identity()
+  if path=='/assets/style.css':return self.send(200,(ROOT/'style.css').read_bytes(),'text/css; charset=utf-8')
   if path in ('/','/teacher','/student'):return self.send(200,(ROOT/'webapp/portal.html').read_bytes(),'text/html; charset=utf-8')
   if not s:return self.send(401,{'error':'Откройте персональную ссылку или войдите как учитель.'})
   with connection() as c:
+   if path=='/api/materials':
+    defaults=json.loads((ROOT/'webapp/materials.json').read_text())
+    edits={r['lesson']:dict(r) for r in c.execute('SELECT lesson,text,updated FROM materials')}
+    for row in defaults:
+     row['custom']=row['lesson'] in edits
+     if row['custom']:row['text']=edits[row['lesson']]['text']
+    return self.send(200,defaults)
+   if path=='/api/journal' and s['role']=='teacher':
+    return self.send(200,[dict(r) for r in c.execute('SELECT a.id,a.student,s.name,a.lesson,a.answer,a.correct,a.created FROM attempts a JOIN students s ON s.id=a.student ORDER BY a.id DESC')])
    if path=='/api/me':
     result={'role':s['role']}
     if s['role']=='student':
@@ -53,7 +64,7 @@ class Handler(BaseHTTPRequestHandler):
    name=path[len('/course/'):]
    if '/' in name or name not in {p.name for p in ROOT.iterdir() if p.suffix in ('.js','.css','.html')}:return self.send(404,{'error':'Не найдено'})
    content=(ROOT/name).read_text();typ='text/javascript; charset=utf-8' if name.endswith('.js') else 'text/css; charset=utf-8' if name.endswith('.css') else 'text/html; charset=utf-8'
-   if name=='index.html':content=content.replace('</body>','<script src="/course/bridge.js"></script></body>')
+   if name=='index.html':content=content.replace('<html lang="ru">','<html lang="ru" class="course-loading">').replace('</body>','<script src="/course/bridge.js"></script></body>')
    return self.send(200,content,typ)
   self.send(404,{'error':'Не найдено'})
  def do_POST(self):
@@ -81,6 +92,16 @@ class Handler(BaseHTTPRequestHandler):
   if path=='/api/logout':return self.send(200,{'ok':True},cookie='olimp=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0')
   with connection() as c:
    if s['role']=='teacher':
+    if path=='/api/material':
+     lesson=int(body['lesson'])
+     if lesson not in range(50):raise ValueError()
+     if body.get('reset'):c.execute('DELETE FROM materials WHERE lesson=?',(lesson,))
+     else:
+      text=str(body['text'])
+      if not text.strip() or len(text)>30000:raise ValueError()
+      c.execute('INSERT OR REPLACE INTO materials VALUES(?,?,?)',(lesson,text,int(time.time())))
+     return self.send(200,{'ok':True})
+
     if path=='/api/students':
      name=str(body['name']).strip();variant=int(body.get('variant',0))
      if not name or len(name)>100 or variant not in (0,1):raise ValueError()
