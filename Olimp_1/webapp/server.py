@@ -16,6 +16,8 @@ def init():
 CREATE TABLE IF NOT EXISTS lessons(student INTEGER,lesson INTEGER,PRIMARY KEY(student,lesson));
 CREATE TABLE IF NOT EXISTS theory(student INTEGER,topic INTEGER,text TEXT,PRIMARY KEY(student,topic));
 CREATE TABLE IF NOT EXISTS materials(lesson INTEGER PRIMARY KEY,text TEXT NOT NULL,updated INTEGER);
+CREATE TABLE IF NOT EXISTS cohorts(id INTEGER PRIMARY KEY,name TEXT NOT NULL,kind TEXT NOT NULL,UNIQUE(name,kind));
+CREATE TABLE IF NOT EXISTS cohort_members(cohort INTEGER,student INTEGER,PRIMARY KEY(cohort,student));
 CREATE TABLE IF NOT EXISTS attempts(id INTEGER PRIMARY KEY,student INTEGER,lesson INTEGER,answer TEXT,correct INTEGER,created INTEGER);''')
   # Additive migration: existing pupils and answers are preserved.
   for table,columns in {'students':{'link_token':'TEXT','class_group':"TEXT NOT NULL DEFAULT ''",'level':"TEXT NOT NULL DEFAULT 'basic'",'note':"TEXT NOT NULL DEFAULT ''"},'attempts':{'review_status':"TEXT NOT NULL DEFAULT 'auto'",'score':'REAL','max_score':'REAL NOT NULL DEFAULT 1','comment':"TEXT NOT NULL DEFAULT ''",'reviewed_at':'INTEGER','variant':'INTEGER NOT NULL DEFAULT -1'}}.items():
@@ -58,6 +60,11 @@ class Handler(BaseHTTPRequestHandler):
   if path in ('/','/teacher','/student'):return self.send(200,(ROOT/'webapp/portal.html').read_bytes(),'text/html; charset=utf-8')
   if not s:return self.send(401,{'error':'Откройте персональную ссылку или войдите как учитель.'})
   with connection() as c:
+   if path=='/api/cohorts' and s['role']=='teacher':
+    rows=[]
+    for row in c.execute('SELECT id,name,kind FROM cohorts ORDER BY kind,name'):
+     group=dict(row);group['members']=[r[0] for r in c.execute('SELECT student FROM cohort_members WHERE cohort=?',(row['id'],))];rows.append(group)
+    return self.send(200,rows)
    if path=='/api/materials':
     defaults=json.loads((ROOT/'webapp/materials.json').read_text())
     edits={r['lesson']:dict(r) for r in c.execute('SELECT lesson,text,updated FROM materials')}
@@ -65,6 +72,7 @@ class Handler(BaseHTTPRequestHandler):
      row['custom']=row['lesson'] in edits
      if row['custom']:row['text']=edits[row['lesson']]['text']
     return self.send(200,defaults)
+   if path=='/api/review-count' and s['role']=='teacher':return self.send(200,{'count':c.execute("SELECT COUNT(*) FROM attempts WHERE review_status='pending'").fetchone()[0]})
    if path=='/api/journal' and s['role']=='teacher':
     return self.send(200,[dict(r) for r in c.execute('SELECT a.id,a.student,s.name,a.lesson,a.answer,a.correct,a.created,a.review_status,a.score,a.max_score,a.comment,a.reviewed_at,a.variant FROM attempts a JOIN students s ON s.id=a.student ORDER BY a.id DESC')])
    if path=='/api/me':
@@ -112,6 +120,30 @@ class Handler(BaseHTTPRequestHandler):
    return self.send(200,{'ok':True},cookie='olimp_'+s['role']+'=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0')
   with connection() as c:
    if s['role']=='teacher':
+    if path=='/api/cohort':
+     name=str(body['name']).strip();kind=str(body['kind']);members=body.get('members',[])
+     if not name or len(name)>100 or kind not in ('class','group') or not isinstance(members,list) or not all(type(i)==int for i in members):raise ValueError()
+     known={r[0] for r in c.execute('SELECT id FROM students')}
+     if not set(members)<=known:raise ValueError()
+     if body.get('id'):
+      gid=int(body['id'])
+      if not c.execute('SELECT 1 FROM cohorts WHERE id=?',(gid,)).fetchone():raise ValueError()
+      c.execute('UPDATE cohorts SET name=?,kind=? WHERE id=?',(name,kind,gid))
+     else:
+      if c.execute('SELECT 1 FROM cohorts WHERE name=? AND kind=?',(name,kind)).fetchone():return self.send(409,{'error':'Такой класс или группа уже существует.'})
+      gid=c.execute('INSERT INTO cohorts(name,kind) VALUES(?,?)',(name,kind)).lastrowid
+     c.execute('DELETE FROM cohort_members WHERE cohort=?',(gid,));c.executemany('INSERT INTO cohort_members VALUES(?,?)',[(gid,i) for i in set(members)])
+     return self.send(200,{'ok':True,'id':gid})
+    if path=='/api/bulk-assign':
+     pupils=body['students'];lessons=body['lessons'];mode=body.get('mode','add');variant=body.get('variant',-1)
+     if not isinstance(pupils,list) or not pupils or not all(type(i)==int for i in pupils) or not isinstance(lessons,list) or not lessons or not all(type(i)==int and 0<=i<50 for i in lessons) or mode not in ('add','replace') or variant not in (-1,0,1):raise ValueError()
+     known={r[0] for r in c.execute('SELECT id FROM students WHERE active=1')}
+     if not set(pupils)<=known:return self.send(400,{'error':'Среди получателей есть неактивный или неизвестный ученик.'})
+     for pupil in set(pupils):
+      if mode=='replace':c.execute('DELETE FROM lessons WHERE student=?',(pupil,))
+      c.executemany('INSERT OR IGNORE INTO lessons VALUES(?,?)',[(pupil,l) for l in set(lessons)])
+      if variant!=-1:c.execute('UPDATE students SET variant=? WHERE id=?',(variant,pupil))
+     return self.send(200,{'ok':True,'students':len(set(pupils)),'lessons':len(set(lessons))})
     if path=='/api/profile':
      sid=int(body['student']);name=str(body['name']).strip();group=str(body.get('class_group',''));level=str(body.get('level','basic'));note=str(body.get('note',''))
      if not name or len(name)>100 or len(group)>100 or level not in ('basic','advanced','expert') or len(note)>10000:raise ValueError()
