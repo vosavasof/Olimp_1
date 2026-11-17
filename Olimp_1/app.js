@@ -1,7 +1,7 @@
 'use strict';
 const $=s=>document.querySelector(s),esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const totalLessons=45;
-const route=Array.from({length:5},(_,t)=>[t*4,t*4+1,40+t,t*4+2,t*4+3,20+t*2,21+t*2,35+t,30+t]).flat();
+const route=Array.from({length:5},(_,t)=>[t*4,t*4+1,40+t,t*4+2,t*4+3,35+t,30+t,20+t*2,21+t*2]).flat();
 function meta(id){if(id>=45)return {topic:id-45,title:"Контрпример · для очень сильных"};if(id>=40)return {topic:id-40,title:"Предскажи следующий шаг"};if(id>=35)return {topic:id-35,title:'Найдите и исправьте ошибку'};if(id<20)return {topic:Math.floor(id/4),title:stages[id%4]};if(id<30)return {topic:extensions[id-20].topic,title:extensions[id-20].title};return {topic:id-30,title:olympiads[id-30].title}}
 const storageKey='algorithm-laboratory-v2';let data={history:[],position:0},storageOK=true;
 try{let d=JSON.parse(localStorage.getItem(storageKey)||'null');if(d&&Array.isArray(d.history)){data.history=d.history.filter(r=>Number.isInteger(r.lesson)&&r.lesson>=0&&r.lesson<50&&typeof r.correct==='boolean').map(r=>({...r,score:r.correct?1:0,maxScore:1}));data.position=Number.isInteger(d.position)&&d.position>=0&&d.position<50?d.position:0}}catch{storageOK=false}

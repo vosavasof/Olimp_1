@@ -1,5 +1,5 @@
 """Local classroom application. Python 3.10+, standard library only."""
-import os,json,sqlite3,secrets,hashlib,time,sys
+import os,json,sqlite3,secrets,hashlib,time,sys,math
 from pathlib import Path
 from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
 from urllib.parse import urlsplit,parse_qs
@@ -17,6 +17,17 @@ CREATE TABLE IF NOT EXISTS lessons(student INTEGER,lesson INTEGER,PRIMARY KEY(st
 CREATE TABLE IF NOT EXISTS theory(student INTEGER,topic INTEGER,text TEXT,PRIMARY KEY(student,topic));
 CREATE TABLE IF NOT EXISTS materials(lesson INTEGER PRIMARY KEY,text TEXT NOT NULL,updated INTEGER);
 CREATE TABLE IF NOT EXISTS attempts(id INTEGER PRIMARY KEY,student INTEGER,lesson INTEGER,answer TEXT,correct INTEGER,created INTEGER);''')
+  # Additive migration: existing pupils and answers are preserved.
+  for table,columns in {'students':{'link_token':'TEXT'},'attempts':{'review_status':"TEXT NOT NULL DEFAULT 'auto'",'score':'REAL','max_score':'REAL NOT NULL DEFAULT 1','comment':"TEXT NOT NULL DEFAULT ''",'reviewed_at':'INTEGER','variant':'INTEGER NOT NULL DEFAULT -1'}}.items():
+   existing={r[1] for r in c.execute('PRAGMA table_info('+table+')')}
+   for name,kind in columns.items():
+    if name not in existing:c.execute('ALTER TABLE '+table+' ADD COLUMN '+name+' '+kind)
+  c.execute("UPDATE attempts SET score=correct WHERE review_status='auto' AND score IS NULL")
+  for old in c.execute("SELECT id,answer FROM attempts WHERE lesson>=20 AND lesson<40 AND review_status='auto'").fetchall():
+   try:answer=json.loads(old['answer'])
+   except (ValueError,TypeError):continue
+   if isinstance(answer,dict) and str(answer.get('python') or answer.get('code') or '').strip():
+    c.execute("UPDATE attempts SET review_status='pending',score=NULL,max_score=5,correct=0 WHERE id=?",(old['id'],))
 class Handler(BaseHTTPRequestHandler):
  def log_message(self,format,*args):pass # Do not log personal URLs or cookie values.
  def send(self,status,value,typ='application/json; charset=utf-8',cookie=None):
@@ -55,16 +66,16 @@ class Handler(BaseHTTPRequestHandler):
      if row['custom']:row['text']=edits[row['lesson']]['text']
     return self.send(200,defaults)
    if path=='/api/journal' and s['role']=='teacher':
-    return self.send(200,[dict(r) for r in c.execute('SELECT a.id,a.student,s.name,a.lesson,a.answer,a.correct,a.created FROM attempts a JOIN students s ON s.id=a.student ORDER BY a.id DESC')])
+    return self.send(200,[dict(r) for r in c.execute('SELECT a.id,a.student,s.name,a.lesson,a.answer,a.correct,a.created,a.review_status,a.score,a.max_score,a.comment,a.reviewed_at,a.variant FROM attempts a JOIN students s ON s.id=a.student ORDER BY a.id DESC')])
    if path=='/api/me':
     result={'role':s['role']}
     if s['role']=='student':
      row=c.execute('SELECT id,name,variant FROM students WHERE id=?',(s['id'],)).fetchone();result.update(dict(row));result['lessons']=[r[0] for r in c.execute('SELECT lesson FROM lessons WHERE student=? ORDER BY lesson',(s['id'],))];result['theory']=[dict(r) for r in c.execute('SELECT topic,text FROM theory WHERE student=?',(s['id'],))]
     return self.send(200,result)
-   if path=='/api/students' and s['role']=='teacher':return self.send(200,[dict(r) for r in c.execute('SELECT id,name,variant,active FROM students')])
+   if path=='/api/students' and s['role']=='teacher':return self.send(200,[dict(r) for r in c.execute('SELECT id,name,variant,active,CASE WHEN active=1 THEN link_token ELSE NULL END AS link_token FROM students')])
    if path.startswith('/api/student/') and s['role']=='teacher':
-    sid=int(path.rsplit('/',1)[1]);return self.send(200,{'lessons':[r[0] for r in c.execute('SELECT lesson FROM lessons WHERE student=?',(sid,))],'theory':[dict(r) for r in c.execute('SELECT topic,text FROM theory WHERE student=?',(sid,))],'attempts':[dict(r) for r in c.execute('SELECT lesson,answer,correct,created FROM attempts WHERE student=? ORDER BY id',(sid,))]})
-   if path=='/api/attempts' and s['role']=='student':return self.send(200,[dict(r) for r in c.execute('SELECT lesson,answer,correct,created FROM attempts WHERE student=? ORDER BY id',(s['id'],))])
+    sid=int(path.rsplit('/',1)[1]);return self.send(200,{'lessons':[r[0] for r in c.execute('SELECT lesson FROM lessons WHERE student=?',(sid,))],'theory':[dict(r) for r in c.execute('SELECT topic,text FROM theory WHERE student=?',(sid,))],'attempts':[dict(r) for r in c.execute('SELECT id,lesson,answer,correct,created,review_status,score,max_score,comment,reviewed_at,variant FROM attempts WHERE student=? ORDER BY id',(sid,))]})
+   if path=='/api/attempts' and s['role']=='student':return self.send(200,[dict(r) for r in c.execute('SELECT id,lesson,answer,correct,created,review_status,score,max_score,comment,reviewed_at,variant FROM attempts WHERE student=? ORDER BY id',(s['id'],))])
   if path.startswith('/course/'):
    name=path[len('/course/'):]
    if '/' in name or name not in {p.name for p in ROOT.iterdir() if p.suffix in ('.js','.css','.html')}:return self.send(404,{'error':'Не найдено'})
@@ -101,6 +112,12 @@ class Handler(BaseHTTPRequestHandler):
    return self.send(200,{'ok':True},cookie='olimp_'+s['role']+'=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0')
   with connection() as c:
    if s['role']=='teacher':
+    if path=='/api/review':
+     attempt=int(body['attempt']);score=float(body['score']);comment=str(body.get('comment',''))
+     row=c.execute('SELECT max_score,review_status FROM attempts WHERE id=?',(attempt,)).fetchone()
+     if not row or row['review_status']=='auto' or not math.isfinite(score) or score<0 or score>row['max_score'] or len(comment)>10000:raise ValueError()
+     c.execute("UPDATE attempts SET review_status='reviewed',score=?,correct=?,comment=?,reviewed_at=? WHERE id=?",(score,int(score==row['max_score']),comment,int(time.time()),attempt))
+     return self.send(200,{'ok':True})
     if path=='/api/material':
      lesson=int(body['lesson'])
      if lesson not in range(50):raise ValueError()
@@ -114,7 +131,7 @@ class Handler(BaseHTTPRequestHandler):
     if path=='/api/students':
      name=str(body['name']).strip();variant=int(body.get('variant',0))
      if not name or len(name)>100 or variant not in (0,1):raise ValueError()
-     key=secrets.token_urlsafe(32);cur=c.execute('INSERT INTO students(name,token,variant) VALUES(?,?,?)',(name,digest(key),variant));return self.send(200,{'id':cur.lastrowid,'link':'/student#'+key})
+     key=secrets.token_urlsafe(32);cur=c.execute('INSERT INTO students(name,token,variant,link_token) VALUES(?,?,?,?)',(name,digest(key),variant,key));return self.send(200,{'id':cur.lastrowid,'link':'/student#'+key})
     if path=='/api/assign':
      sid=int(body['student']);lessons=body['lessons'];variant=int(body['variant'])
      if variant not in (0,1) or not all(type(i)==int and 0<=i<50 for i in lessons):raise ValueError()
@@ -125,13 +142,16 @@ class Handler(BaseHTTPRequestHandler):
       c.execute('INSERT OR REPLACE INTO theory VALUES(?,?,?)',(sid,topic,text))
      return self.send(200,{'ok':True})
     if path=='/api/rotate':
-     key=secrets.token_urlsafe(32);c.execute('UPDATE students SET token=?,active=1 WHERE id=?',(digest(key),int(body['student'])));return self.send(200,{'link':'/student#'+key})
+     key=secrets.token_urlsafe(32);c.execute('UPDATE students SET token=?,link_token=?,active=1 WHERE id=?',(digest(key),key,int(body['student'])));return self.send(200,{'link':'/student#'+key})
     if path=='/api/revoke':c.execute('UPDATE students SET active=0 WHERE id=?',(int(body['student']),));return self.send(200,{'ok':True})
    if path=='/api/attempt' and s['role']=='student':
     lesson=int(body['lesson'])
     if not c.execute('SELECT 1 FROM lessons WHERE student=? AND lesson=?',(s['id'],lesson)).fetchone():return self.send(403,{'error':'Учитель не открыл это задание.'})
-    c.execute('INSERT INTO attempts(student,lesson,answer,correct,created) VALUES(?,?,?,?,?)',(s['id'],lesson,json.dumps(body['answer'],ensure_ascii=False),int(body.get('correct') is True),int(time.time())))
-    return self.send(200,{'ok':True})
+    answer=body['answer'];manual=20<=lesson<40
+    if manual and (not isinstance(answer,dict) or not str(answer.get('python') or answer.get('code') or '').strip()):raise ValueError()
+    variant=c.execute('SELECT variant FROM students WHERE id=?',(s['id'],)).fetchone()[0]
+    cur=c.execute('INSERT INTO attempts(student,lesson,answer,correct,created,review_status,score,max_score,variant) VALUES(?,?,?,?,?,?,?,?,?)',(s['id'],lesson,json.dumps(answer,ensure_ascii=False),0 if manual else int(body.get('correct') is True),int(time.time()),'pending' if manual else 'auto',None if manual else int(body.get('correct') is True),5 if manual else 1,variant))
+    return self.send(200,{'ok':True,'id':cur.lastrowid,'review_status':'pending' if manual else 'auto'})
   self.send(403,{'error':'Недостаточно прав'})
 if __name__=='__main__':
  init();port=int(os.environ.get('PORT','8000'));print('Кабинет учителя: http://localhost:'+str(port)+'/teacher#'+ADMIN,flush=True)
