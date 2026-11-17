@@ -1,0 +1,10 @@
+{
+  "name": "Онлайн лаборатория алгоритмов",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {"label": "Лаборатория алгоритмов", "onAutoForward": "notify"}
+  },
+  "postStartCommand": "python3 Olimp_1/webapp/start_cloud.py",
+  "remoteUser": "vscode"
+}

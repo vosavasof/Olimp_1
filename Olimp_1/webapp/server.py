@@ -21,7 +21,7 @@ class Handler(BaseHTTPRequestHandler):
  def send(self,status,value,typ='application/json; charset=utf-8',cookie=None):
   b=value if isinstance(value,bytes) else (json.dumps(value,ensure_ascii=False).encode() if typ.startswith('application/json') else value.encode())
   self.send_response(status);self.send_header('Content-Type',typ);self.send_header('Content-Length',str(len(b)));self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer');self.send_header('X-Frame-Options','SAMEORIGIN')
-  if cookie:self.send_header('Set-Cookie',cookie)
+  if cookie:self.send_header('Set-Cookie',cookie+('; Secure' if os.environ.get('OLIMP_SECURE_COOKIE')=='1' else ''))
   self.end_headers();self.wfile.write(b)
  def identity(self):
   cookies=dict(x.strip().split('=',1) for x in self.headers.get('Cookie','').split(';') if '=' in x)
@@ -63,7 +63,7 @@ class Handler(BaseHTTPRequestHandler):
  def post(self):
   if self.headers.get('Content-Type','').split(';')[0]!='application/json':return self.send(415,{'error':'Требуется JSON'})
   origin=self.headers.get('Origin')
-  if origin and urlsplit(origin).netloc!=self.headers.get('Host'):return self.send(403,{'error':'Недопустимый источник запроса'})
+  if origin and origin!=os.environ.get('OLIMP_PUBLIC_ORIGIN') and urlsplit(origin).netloc!=self.headers.get('Host'):return self.send(403,{'error':'Недопустимый источник запроса'})
   n=int(self.headers.get('Content-Length','0'))
   if n>200000:return self.send(413,{'error':'Слишком большой запрос'})
   body=json.loads(self.rfile.read(n));path=urlsplit(self.path).path
