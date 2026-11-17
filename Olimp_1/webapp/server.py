@@ -1,9 +1,10 @@
 """Local classroom application. Python 3.10+, standard library only."""
-import os,json,sqlite3,secrets,hashlib,time,sys,math
+import os,json,sqlite3,secrets,hashlib,time,sys,math,re
 from pathlib import Path
 from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
 from urllib.parse import urlsplit,parse_qs
 ROOT=Path(__file__).resolve().parent.parent
+ASSET_VERSION=hashlib.sha256(b''.join(p.read_bytes() for p in sorted(ROOT.glob('*.js')))+b''.join(p.read_bytes() for p in sorted(ROOT.glob('*.css')))).hexdigest()[:12]
 DB=Path(os.environ.get('OLIMP_DB',str(ROOT/'webapp'/'classroom.sqlite3')))
 ADMIN=os.environ.get('OLIMP_TEACHER_KEY') or secrets.token_urlsafe(32)
 SESSIONS={}
@@ -89,6 +90,7 @@ class Handler(BaseHTTPRequestHandler):
    if '/' in name or name not in {p.name for p in ROOT.iterdir() if p.suffix in ('.js','.css','.html')}:return self.send(404,{'error':'Не найдено'})
    content=(ROOT/name).read_text();typ='text/javascript; charset=utf-8' if name.endswith('.js') else 'text/css; charset=utf-8' if name.endswith('.css') else 'text/html; charset=utf-8'
    if name=='index.html':content=content.replace('<html lang="ru">','<html lang="ru" class="course-loading">').replace('</body>','<script src="/course/bridge.js"></script></body>')
+   if name=='index.html':content=re.sub(r'(src|href)="([^"]+\.(?:js|css))"',lambda m:m[1]+'="'+m[2]+'?v='+ASSET_VERSION+'"',content)
    if name=='index.html':content=content.replace('<body>',"<body><script>window.addEventListener('error',function(e){document.documentElement.classList.remove('course-loading');var p=document.createElement('p');p.setAttribute('role','alert');p.style.cssText='padding:20px;background:#fff0dc;color:#743f20;position:relative;z-index:10';p.textContent='Лаборатория не смогла загрузиться: '+(e.message||'не загружен файл приложения')+'. Обновите страницу; если ошибка повторится, сообщите учителю.';document.body.prepend(p)},true);setTimeout(function(){if(document.documentElement.classList.contains('course-loading')){document.documentElement.classList.remove('course-loading');var p=document.createElement('p');p.textContent='Загрузка кабинета задерживается. Проверьте соединение и обновите страницу.';document.body.prepend(p)}},15000);</script>")
    return self.send(200,content,typ)
   self.send(404,{'error':'Не найдено'})
