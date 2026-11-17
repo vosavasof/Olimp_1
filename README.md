@@ -1,3 +1,7 @@
 # Онлайн лаборатория алгоритмов
 
-Приложение находится в папке Olimp_1. Запуск школьного сервера: `python3 Olimp_1/webapp/server.py`. Инструкция и ограничения: Olimp_1/webapp/README.md.
+Школьное веб-приложение в папке Olimp_1.
+
+Запуск: `python3 Olimp_1/webapp/server.py`
+
+[Инструкция школьного сервера](Olimp_1/webapp/README.md)
