@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS theory(student INTEGER,topic INTEGER,text TEXT,PRIMAR
 CREATE TABLE IF NOT EXISTS materials(lesson INTEGER PRIMARY KEY,text TEXT NOT NULL,updated INTEGER);
 CREATE TABLE IF NOT EXISTS attempts(id INTEGER PRIMARY KEY,student INTEGER,lesson INTEGER,answer TEXT,correct INTEGER,created INTEGER);''')
   # Additive migration: existing pupils and answers are preserved.
-  for table,columns in {'students':{'link_token':'TEXT'},'attempts':{'review_status':"TEXT NOT NULL DEFAULT 'auto'",'score':'REAL','max_score':'REAL NOT NULL DEFAULT 1','comment':"TEXT NOT NULL DEFAULT ''",'reviewed_at':'INTEGER','variant':'INTEGER NOT NULL DEFAULT -1'}}.items():
+  for table,columns in {'students':{'link_token':'TEXT','class_group':"TEXT NOT NULL DEFAULT ''",'level':"TEXT NOT NULL DEFAULT 'basic'",'note':"TEXT NOT NULL DEFAULT ''"},'attempts':{'review_status':"TEXT NOT NULL DEFAULT 'auto'",'score':'REAL','max_score':'REAL NOT NULL DEFAULT 1','comment':"TEXT NOT NULL DEFAULT ''",'reviewed_at':'INTEGER','variant':'INTEGER NOT NULL DEFAULT -1'}}.items():
    existing={r[1] for r in c.execute('PRAGMA table_info('+table+')')}
    for name,kind in columns.items():
     if name not in existing:c.execute('ALTER TABLE '+table+' ADD COLUMN '+name+' '+kind)
@@ -72,9 +72,9 @@ class Handler(BaseHTTPRequestHandler):
     if s['role']=='student':
      row=c.execute('SELECT id,name,variant FROM students WHERE id=?',(s['id'],)).fetchone();result.update(dict(row));result['lessons']=[r[0] for r in c.execute('SELECT lesson FROM lessons WHERE student=? ORDER BY lesson',(s['id'],))];result['theory']=[dict(r) for r in c.execute('SELECT topic,text FROM theory WHERE student=?',(s['id'],))]
     return self.send(200,result)
-   if path=='/api/students' and s['role']=='teacher':return self.send(200,[dict(r) for r in c.execute('SELECT id,name,variant,active,CASE WHEN active=1 THEN link_token ELSE NULL END AS link_token FROM students')])
+   if path=='/api/students' and s['role']=='teacher':return self.send(200,[dict(r) for r in c.execute('SELECT id,name,variant,active,class_group,level,note,(SELECT MAX(created) FROM attempts WHERE student=students.id) AS last_activity,CASE WHEN active=1 THEN link_token ELSE NULL END AS link_token FROM students')])
    if path.startswith('/api/student/') and s['role']=='teacher':
-    sid=int(path.rsplit('/',1)[1]);return self.send(200,{'lessons':[r[0] for r in c.execute('SELECT lesson FROM lessons WHERE student=?',(sid,))],'theory':[dict(r) for r in c.execute('SELECT topic,text FROM theory WHERE student=?',(sid,))],'attempts':[dict(r) for r in c.execute('SELECT id,lesson,answer,correct,created,review_status,score,max_score,comment,reviewed_at,variant FROM attempts WHERE student=? ORDER BY id',(sid,))]})
+    sid=int(path.rsplit('/',1)[1]);return self.send(200,{'profile':dict(c.execute('SELECT id,name,variant,active,class_group,level,note FROM students WHERE id=?',(sid,)).fetchone()),'lessons':[r[0] for r in c.execute('SELECT lesson FROM lessons WHERE student=?',(sid,))],'theory':[dict(r) for r in c.execute('SELECT topic,text FROM theory WHERE student=?',(sid,))],'attempts':[dict(r) for r in c.execute('SELECT id,lesson,answer,correct,created,review_status,score,max_score,comment,reviewed_at,variant FROM attempts WHERE student=? ORDER BY id',(sid,))]})
    if path=='/api/attempts' and s['role']=='student':return self.send(200,[dict(r) for r in c.execute('SELECT id,lesson,answer,correct,created,review_status,score,max_score,comment,reviewed_at,variant FROM attempts WHERE student=? ORDER BY id',(s['id'],))])
   if path.startswith('/course/'):
    name=path[len('/course/'):]
@@ -112,6 +112,11 @@ class Handler(BaseHTTPRequestHandler):
    return self.send(200,{'ok':True},cookie='olimp_'+s['role']+'=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0')
   with connection() as c:
    if s['role']=='teacher':
+    if path=='/api/profile':
+     sid=int(body['student']);name=str(body['name']).strip();group=str(body.get('class_group',''));level=str(body.get('level','basic'));note=str(body.get('note',''))
+     if not name or len(name)>100 or len(group)>100 or level not in ('basic','advanced','expert') or len(note)>10000:raise ValueError()
+     c.execute('UPDATE students SET name=?,class_group=?,level=?,note=? WHERE id=?',(name,group,level,note,sid))
+     return self.send(200,{'ok':True})
     if path=='/api/review':
      attempt=int(body['attempt']);score=float(body['score']);comment=str(body.get('comment',''))
      row=c.execute('SELECT max_score,review_status FROM attempts WHERE id=?',(attempt,)).fetchone()
