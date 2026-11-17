@@ -2,7 +2,7 @@
 import os,json,sqlite3,secrets,hashlib,time,sys
 from pathlib import Path
 from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit,parse_qs
 ROOT=Path(__file__).resolve().parent.parent
 DB=Path(os.environ.get('OLIMP_DB',str(ROOT/'webapp'/'classroom.sqlite3')))
 ADMIN=os.environ.get('OLIMP_TEACHER_KEY') or secrets.token_urlsafe(32)
@@ -26,7 +26,12 @@ class Handler(BaseHTTPRequestHandler):
   self.end_headers();self.wfile.write(b)
  def identity(self):
   cookies=dict(x.strip().split('=',1) for x in self.headers.get('Cookie','').split(';') if '=' in x)
-  session=SESSIONS.get(cookies.get('olimp',''))
+  role=self.headers.get('X-Olimp-Role') or parse_qs(urlsplit(self.path).query).get('role',[None])[0]
+  if role not in ('teacher','student'):role='student' if urlsplit(self.path).path=='/student' else 'teacher'
+  session=SESSIONS.get(cookies.get('olimp_'+role,''))
+  if not session:
+   legacy=SESSIONS.get(cookies.get('olimp',''))
+   if legacy and legacy.get('role')==role:session=legacy
   if not session or session['expires']<time.time():return None
   if session['role']=='student':
    with connection() as c:
@@ -65,6 +70,7 @@ class Handler(BaseHTTPRequestHandler):
    if '/' in name or name not in {p.name for p in ROOT.iterdir() if p.suffix in ('.js','.css','.html')}:return self.send(404,{'error':'Не найдено'})
    content=(ROOT/name).read_text();typ='text/javascript; charset=utf-8' if name.endswith('.js') else 'text/css; charset=utf-8' if name.endswith('.css') else 'text/html; charset=utf-8'
    if name=='index.html':content=content.replace('<html lang="ru">','<html lang="ru" class="course-loading">').replace('</body>','<script src="/course/bridge.js"></script></body>')
+   if name=='index.html':content=content.replace('<body>',"<body><script>window.addEventListener('error',function(e){document.documentElement.classList.remove('course-loading');var p=document.createElement('p');p.setAttribute('role','alert');p.style.cssText='padding:20px;background:#fff0dc;color:#743f20;position:relative;z-index:10';p.textContent='Лаборатория не смогла загрузиться: '+(e.message||'не загружен файл приложения')+'. Обновите страницу; если ошибка повторится, сообщите учителю.';document.body.prepend(p)},true);setTimeout(function(){if(document.documentElement.classList.contains('course-loading')){document.documentElement.classList.remove('course-loading');var p=document.createElement('p');p.textContent='Загрузка кабинета задерживается. Проверьте соединение и обновите страницу.';document.body.prepend(p)}},15000);</script>")
    return self.send(200,content,typ)
   self.send(404,{'error':'Не найдено'})
  def do_POST(self):
@@ -86,10 +92,13 @@ class Handler(BaseHTTPRequestHandler):
     if row:session={'role':'student','id':row['id'],'token':row['token']}
    if not session:return self.send(401,{'error':'Ссылка недействительна или отозвана.'})
    token=secrets.token_urlsafe(32);session['expires']=time.time()+8*3600;SESSIONS[token]=session
-   return self.send(200,{'ok':True},cookie='olimp='+token+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800')
+   return self.send(200,{'ok':True,'role':session['role']},cookie='olimp_'+session['role']+'='+token+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800')
   s=self.identity()
   if not s:return self.send(401,{'error':'Войдите снова.'})
-  if path=='/api/logout':return self.send(200,{'ok':True},cookie='olimp=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0')
+  if path=='/api/logout':
+   for key,session in list(SESSIONS.items()):
+    if session is s:SESSIONS.pop(key,None)
+   return self.send(200,{'ok':True},cookie='olimp_'+s['role']+'=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0')
   with connection() as c:
    if s['role']=='teacher':
     if path=='/api/material':
