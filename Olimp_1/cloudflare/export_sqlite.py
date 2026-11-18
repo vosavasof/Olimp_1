@@ -5,7 +5,7 @@ p=argparse.ArgumentParser();p.add_argument('database');p.add_argument('output');
 source=Path(a.database).resolve();dest=Path(a.output).resolve()
 if source==dest:raise SystemExit('Output must differ from the database.')
 con=sqlite3.connect(source.as_uri()+'?mode=ro',uri=True);con.row_factory=sqlite3.Row;con.execute('BEGIN')
-names=['students','lessons','theory','materials','cohorts','cohort_members','attempts','notifications'];existing={r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")};sql=[];counts={}
+names=['students','lessons','theory','materials','cohorts','cohort_members','attempts','notifications','entity_states'];existing={r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")};sql=[];counts={}
 for name in names:
  if name not in existing:continue
  columns=[r[1] for r in con.execute('PRAGMA table_info('+name+')')];data=con.execute('SELECT * FROM '+name).fetchall();counts[name]=len(data)

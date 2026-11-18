@@ -13,6 +13,7 @@ def connection():
  c=sqlite3.connect(DB);c.row_factory=sqlite3.Row;return c
 def init():
  with connection() as c:
+  c.execute("CREATE TABLE IF NOT EXISTS entity_states(kind TEXT NOT NULL,entity_id INTEGER NOT NULL,state TEXT NOT NULL,previous_active INTEGER,changed_at INTEGER NOT NULL,PRIMARY KEY(kind,entity_id))")
   c.executescript('''CREATE TABLE IF NOT EXISTS students(id INTEGER PRIMARY KEY,name TEXT NOT NULL,token TEXT UNIQUE NOT NULL,variant INTEGER NOT NULL,active INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS lessons(student INTEGER,lesson INTEGER,PRIMARY KEY(student,lesson));
 CREATE TABLE IF NOT EXISTS theory(student INTEGER,topic INTEGER,text TEXT,PRIMARY KEY(student,topic));
@@ -71,7 +72,7 @@ class Handler(BaseHTTPRequestHandler):
    if path=='/api/cohorts' and s['role']=='teacher':
     rows=[]
     for row in c.execute('SELECT id,name,kind FROM cohorts ORDER BY kind,name'):
-     group=dict(row);group['members']=[r[0] for r in c.execute('SELECT student FROM cohort_members WHERE cohort=?',(row['id'],))];rows.append(group)
+     group=dict(row);state=c.execute("SELECT state FROM entity_states WHERE kind='cohort' AND entity_id=?",(row['id'],)).fetchone();group['lifecycle']=state[0] if state else 'active';group['members']=[r[0] for r in c.execute('SELECT student FROM cohort_members WHERE cohort=?',(row['id'],))];rows.append(group)
     return self.send(200,rows)
    if path=='/api/notifications' and s['role']=='student':return self.send(200,[dict(r) for r in c.execute('SELECT id,lesson,attempt,message,created,seen FROM notifications WHERE student=? ORDER BY id DESC',(s['id'],))])
    if path=='/api/materials':
@@ -89,7 +90,11 @@ class Handler(BaseHTTPRequestHandler):
     if s['role']=='student':
      row=c.execute('SELECT id,name,variant,display_name,about,learning_goal FROM students WHERE id=?',(s['id'],)).fetchone();result.update(dict(row));result['lessons']=[r[0] for r in c.execute('SELECT lesson FROM lessons WHERE student=? ORDER BY lesson',(s['id'],))];result['theory']=[dict(r) for r in c.execute('SELECT topic,text FROM theory WHERE student=?',(s['id'],))]
     return self.send(200,result)
-   if path=='/api/students' and s['role']=='teacher':return self.send(200,[dict(r) for r in c.execute('SELECT id,name,variant,active,class_group,level,note,(SELECT MAX(created) FROM attempts WHERE student=students.id) AS last_activity,CASE WHEN active=1 THEN link_token ELSE NULL END AS link_token FROM students')])
+   if path=='/api/students' and s['role']=='teacher':
+    pupils=[]
+    for r in c.execute('SELECT id,name,variant,active,class_group,level,note,(SELECT MAX(created) FROM attempts WHERE student=students.id) AS last_activity,CASE WHEN active=1 THEN link_token ELSE NULL END AS link_token FROM students'):
+     p=dict(r);state=c.execute("SELECT state FROM entity_states WHERE kind='student' AND entity_id=?",(r['id'],)).fetchone();p['lifecycle']=state[0] if state else 'active';p['lessons']=[row[0] for row in c.execute('SELECT lesson FROM lessons WHERE student=? ORDER BY lesson',(r['id'],))];pupils.append(p)
+    return self.send(200,pupils)
    if path.startswith('/api/student/') and s['role']=='teacher':
     sid=int(path.rsplit('/',1)[1]);return self.send(200,{'profile':dict(c.execute('SELECT id,name,variant,active,class_group,level,note,display_name,about,learning_goal FROM students WHERE id=?',(sid,)).fetchone()),'lessons':[r[0] for r in c.execute('SELECT lesson FROM lessons WHERE student=?',(sid,))],'theory':[dict(r) for r in c.execute('SELECT topic,text FROM theory WHERE student=?',(sid,))],'attempts':[dict(r) for r in c.execute('SELECT id,lesson,answer,correct,created,review_status,score,max_score,comment,reviewed_at,variant FROM attempts WHERE student=? ORDER BY id',(sid,))]})
    if path=='/api/attempts' and s['role']=='student':return self.send(200,[dict(r) for r in c.execute('SELECT id,lesson,answer,correct,created,review_status,score,max_score,comment,reviewed_at,variant FROM attempts WHERE student=? ORDER BY id',(s['id'],))])
@@ -138,6 +143,39 @@ class Handler(BaseHTTPRequestHandler):
     c.execute('UPDATE notifications SET seen=1 WHERE id=? AND student=?',(int(body['id']),s['id']))
     return self.send(200,{'ok':True})
    if s['role']=='teacher':
+    if path=='/api/lifecycle':
+     entity=body.get('entity');ident=body.get('id');action=body.get('action')
+     if entity not in ('student','cohort') or type(ident)!=int or action not in ('archive','remove','restore'):raise ValueError()
+     table='students' if entity=='student' else 'cohorts';row=c.execute('SELECT * FROM '+table+' WHERE id=?',(ident,)).fetchone()
+     if not row:return self.send(404,{'error':'Запись не найдена.'})
+     state=c.execute('SELECT * FROM entity_states WHERE kind=? AND entity_id=?',(entity,ident)).fetchone()
+     if action=='restore':
+      if state and entity=='student':c.execute('UPDATE students SET active=? WHERE id=?',(state['previous_active'],ident))
+      c.execute('DELETE FROM entity_states WHERE kind=? AND entity_id=?',(entity,ident))
+     else:
+      previous=state['previous_active'] if state else row['active'] if entity=='student' else None
+      c.execute('INSERT INTO entity_states VALUES(?,?,?,?,?) ON CONFLICT(kind,entity_id) DO UPDATE SET state=excluded.state,changed_at=excluded.changed_at',(entity,ident,'archived' if action=='archive' else 'removed',previous,int(time.time())))
+      if entity=='student':
+       c.execute('UPDATE students SET active=0 WHERE id=?',(ident,))
+       for token,session in list(SESSIONS.items()):
+        if session.get('role')=='student' and session.get('id')==ident:SESSIONS.pop(token,None)
+     return self.send(200,{'ok':True})
+    if path=='/api/access':
+     pupils=body.get('students');changes=body.get('changes',[]);variant=body.get('variant',-1)
+     if not isinstance(pupils,list) or not pupils or len(pupils)>1000 or not all(type(i)==int and i>0 for i in pupils):raise ValueError()
+     if not isinstance(changes,list) or len(changes)>50 or variant not in (-1,0,1) or not all(type(r.get('lesson'))==int and 0<=r['lesson']<50 and type(r.get('open'))==bool for r in changes) or len({r['lesson'] for r in changes})!=len(changes) or (not changes and variant==-1):raise ValueError()
+     pupils=list(set(pupils));encoded=json.dumps(pupils);c.execute('BEGIN IMMEDIATE')
+     known=[r[0] for r in c.execute("SELECT id FROM students WHERE id IN(SELECT value FROM json_each(?)) AND NOT EXISTS(SELECT 1 FROM entity_states WHERE kind='student' AND entity_id=students.id)",(encoded,))]
+     if len(known)!=len(pupils):raise ValueError()
+     if 'cohort' in body and not c.execute("SELECT 1 FROM cohorts WHERE id=? AND NOT EXISTS(SELECT 1 FROM entity_states WHERE kind='cohort' AND entity_id=cohorts.id)",(body['cohort'],)).fetchone():raise ValueError()
+     for change in changes:
+      if change['open']:c.execute('INSERT OR IGNORE INTO lessons SELECT value,? FROM json_each(?)',(change['lesson'],encoded))
+      else:c.execute('DELETE FROM lessons WHERE student IN(SELECT value FROM json_each(?)) AND lesson=?',(encoded,change['lesson']))
+     if variant!=-1:c.execute('UPDATE students SET variant=? WHERE id IN(SELECT value FROM json_each(?))',(variant,encoded))
+     result=[]
+     for r in c.execute('SELECT id,variant FROM students WHERE id IN(SELECT value FROM json_each(?))',(encoded,)):
+      p=dict(r);p['lessons']=[v[0] for v in c.execute('SELECT lesson FROM lessons WHERE student=? ORDER BY lesson',(r['id'],))];result.append(p)
+     return self.send(200,{'ok':True,'students':result})
     if path=='/api/cohort':
      name=str(body['name']).strip();kind=str(body['kind']);members=body.get('members',[])
      if not name or len(name)>100 or kind not in ('class','group') or not isinstance(members,list) or not all(type(i)==int for i in members):raise ValueError()

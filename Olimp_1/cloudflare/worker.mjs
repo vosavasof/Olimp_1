@@ -1,7 +1,8 @@
+import {ensureLifecycle,setLifecycle,setAccess} from './lifecycle.mjs';
 import { MATERIALS } from './generated/materials.mjs';
 const ATT='id,lesson,answer,correct,created,review_status,score,max_score,comment,reviewed_at,variant';
 const PROFILE='id,name,variant,active,class_group,level,note,display_name,about,learning_goal';
-const TABLES=['students','lessons','theory','materials','cohorts','cohort_members','attempts','notifications'];
+const TABLES=['students','lessons','theory','materials','cohorts','cohort_members','attempts','notifications','entity_states'];
 class HTTPError extends Error{constructor(status,message){super(message);this.status=status}}
 function need(ok,message='Проверьте введённые данные.',status=400){if(!ok)throw new HTTPError(status,message)}
 const now=()=>Math.floor(Date.now()/1000),integer=n=>Number.isSafeInteger(n),unique=a=>[...new Set(a)];
@@ -30,16 +31,18 @@ async function getAPI(path,u,s,env){let db=env.DB,teacher=s.role==='teacher',sid
  if(path==='/api/attempts'&&!teacher)return json(await rows(db,'SELECT '+ATT+' FROM attempts WHERE student=? ORDER BY id',[sid]));
  if((path==='/api/journal-delta'&&teacher)||(path==='/api/attempts-delta'&&!teacher)){let after=Number(u.searchParams.get('after')||0),reviewed=Number(u.searchParams.get('reviewed_after')||0);need(integer(after)&&after>=0&&integer(reviewed)&&reviewed>=0);let data=teacher?await rows(db,'SELECT a.*,s.name FROM attempts a JOIN students s ON s.id=a.student WHERE a.id>? OR a.reviewed_at>=? ORDER BY a.id DESC',[after,reviewed]):await rows(db,'SELECT '+ATT+' FROM attempts WHERE student=? AND (id>? OR reviewed_at>=?) ORDER BY id',[sid,after,reviewed]);return json({rows:data,reviewed_after:Math.max(0,now()-5)})}
  if(teacher){
-  if(path==='/api/students')return json(await rows(db,'SELECT id,name,variant,active,class_group,level,note,(SELECT MAX(created) FROM attempts WHERE student=students.id) AS last_activity,CASE WHEN active=1 THEN link_token ELSE NULL END AS link_token FROM students'));
+  if(path==='/api/students'){let pupils=await rows(db,"SELECT id,name,variant,active,class_group,level,note,(SELECT MAX(created) FROM attempts WHERE student=students.id) AS last_activity,CASE WHEN active=1 THEN link_token ELSE NULL END AS link_token,COALESCE((SELECT state FROM entity_states WHERE kind='student' AND entity_id=students.id),'active') AS lifecycle FROM students"),assigned=await rows(db,'SELECT student,lesson FROM lessons ORDER BY lesson');return json(pupils.map(p=>({...p,lessons:assigned.filter(r=>r.student===p.id).map(r=>r.lesson)})))}
   if(path==='/api/journal')return json(await rows(db,'SELECT a.*,s.name FROM attempts a JOIN students s ON s.id=a.student ORDER BY a.id DESC'));
   if(path==='/api/review-count')return json({count:(await first(db,"SELECT COUNT(*) AS n FROM attempts WHERE review_status='pending'")).n});
-  if(path==='/api/cohorts'){let groups=await rows(db,'SELECT id,name,kind FROM cohorts ORDER BY kind,name'),members=await rows(db,'SELECT cohort,student FROM cohort_members');return json(groups.map(g=>({...g,members:members.filter(r=>r.cohort===g.id).map(r=>r.student)})))}
-  if(path.startsWith('/api/student/')){let id=Number(path.split('/').at(-1));need(integer(id));let profile=await first(db,'SELECT '+PROFILE+' FROM students WHERE id=?',[id]);need(profile,'Ученик не найден.',404);return json({profile,lessons:(await rows(db,'SELECT lesson FROM lessons WHERE student=?',[id])).map(r=>r.lesson),theory:await rows(db,'SELECT topic,text FROM theory WHERE student=?',[id]),attempts:await rows(db,'SELECT '+ATT+' FROM attempts WHERE student=? ORDER BY id',[id])})}
+  if(path==='/api/cohorts'){let groups=await rows(db,"SELECT id,name,kind,COALESCE((SELECT state FROM entity_states WHERE kind='cohort' AND entity_id=cohorts.id),'active') AS lifecycle FROM cohorts ORDER BY kind,name"),members=await rows(db,'SELECT cohort,student FROM cohort_members');return json(groups.map(g=>({...g,members:members.filter(r=>r.cohort===g.id).map(r=>r.student)})))}
+  if(path.startsWith('/api/student/')){let id=Number(path.split('/').at(-1));need(integer(id));let profile=await first(db,"SELECT "+PROFILE+",COALESCE((SELECT state FROM entity_states WHERE kind='student' AND entity_id=students.id),'active') AS lifecycle FROM students WHERE id=?",[id]);need(profile,'Ученик не найден.',404);return json({profile,lessons:(await rows(db,'SELECT lesson FROM lessons WHERE student=?',[id])).map(r=>r.lesson),theory:await rows(db,'SELECT topic,text FROM theory WHERE student=?',[id]),attempts:await rows(db,'SELECT '+ATT+' FROM attempts WHERE student=? ORDER BY id',[id])})}
   if(path==='/api/backup'){let data={version:1,created:new Date().toISOString(),tables:{}};for(let table of TABLES)data.tables[table]=await rows(db,'SELECT * FROM '+table);return json(data)}
  }
  throw new HTTPError(404,'Не найдено.');
 }
 async function postAPI(path,b,s,env){let db=env.DB,sid=s.student,teacher=s.role==='teacher';
+ if(path==='/api/lifecycle'){need(teacher,'Недостаточно прав.',403);return json(await setLifecycle(db,b,need))}
+ if(path==='/api/access'){need(teacher,'Недостаточно прав.',403);return json(await setAccess(db,b,need))}
  if(path==='/api/logout'){await run(db,'DELETE FROM sessions WHERE token=?',[s.token]);return json({ok:true},200,'olimp_'+s.role+'=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0')}
  if(!teacher){
   if(path==='/api/self-profile'){await run(db,'UPDATE students SET display_name=?,about=?,learning_goal=? WHERE id=?',[text(b.display_name??'',100),text(b.about??'',1000),text(b.learning_goal??'',1000),sid]);return json({ok:true})}
@@ -71,10 +74,10 @@ export default {async fetch(request,env){try{let u=new URL(request.url),path=u.p
  if(path==='/app'){need(env.DB,'База данных ещё не подключена.',503);let s=await identity(request,env,'student')||await identity(request,env,'teacher');return redirect(s?.role==='teacher'?'/teacher':'/student')}
  if(['/','/teacher','/student'].includes(path))return asset(request,env,'/portal.html');
  if(!path.startsWith('/api/'))return env.ASSETS.fetch(request);
- need(env.DB,'База данных ещё не подключена.',503);
+ need(env.DB,'База данных ещё не подключена.',503);await ensureLifecycle(env.DB);
  if(request.method==='POST'){let origin=request.headers.get('Origin');need(!origin||origin===u.origin,'Недопустимый источник запроса.',403);let b=await bodyOf(request);
   if(path==='/api/login'){let configuredHash=await teacherHash(env);need(configuredHash,'Ключ учителя ещё не настроен.',503);let supplied=typeof b.key==='string'?b.key:'';need(supplied.length>0&&supplied.length<1000,'Ссылка недействительна или отозвана.',401);let hashed=await hash(supplied),teacher=equal(hashed,configuredHash),pupil=teacher?null:await first(env.DB,'SELECT id,token FROM students WHERE token=? AND active=1',[hashed]);need(teacher||pupil,'Ссылка недействительна или отозвана.',401);let raw=key(),role=teacher?'teacher':'student';await env.DB.batch([statement(env.DB,'DELETE FROM sessions WHERE token IN(SELECT token FROM sessions WHERE expires<? LIMIT 100)',[now()]),statement(env.DB,'INSERT INTO sessions(token,role,student,student_token,expires) VALUES(?,?,?,?,?)',[await hash(raw),role,pupil?.id??null,hashed,now()+28800])]);return json({ok:true,role},200,'olimp_'+role+'='+raw+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800'+(u.protocol==='https:'?'; Secure':''))}
   let s=await identity(request,env);need(s,'Войдите снова.',401);return await postAPI(path,b,s,env)
  }
  need(request.method==='GET','Метод не поддерживается.',405);let s=await identity(request,env);need(s,'Откройте персональную ссылку или войдите как учитель.',401);return await getAPI(path,u,s,env)
- }catch(error){if(error instanceof HTTPError)return json({error:error.message},error.status);return json({error:'Не удалось выполнить запрос. Проверьте подключение базы и журнал Cloudflare.'},500)}}};
+ }catch(error){if(error instanceof HTTPError)return json({error:error.message},error.status);return json({error:'Не удалось выполнить запрос. Обновите страницу или сообщите учителю.'},500)}}};
