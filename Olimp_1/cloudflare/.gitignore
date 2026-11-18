@@ -1,0 +1,7 @@
+public/
+generated/
+node_modules/
+.wrangler/
+.dev.vars
+*.backup.json
+*.private.sql
