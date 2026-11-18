@@ -55,3 +55,54 @@
 @media(max-width:700px),(max-height:500px) and (max-width:1000px) and (hover:none){.course-phone .lesson-progress{gap:8px;padding-top:9px}.course-phone .lesson-progress p{flex-direction:row;align-items:center;justify-content:flex-start;gap:4px;line-height:1.2;min-width:0}.course-phone .lesson-progress b{order:-1;font-size:14px;white-space:nowrap}.course-phone .lesson-progress p>span{font-size:0;line-height:1;white-space:nowrap}.course-phone .lesson-progress p>span::after{font-size:9px}.course-phone .lesson-progress p:first-of-type>span::after{content:'Пройдено'}.course-phone .lesson-progress p:nth-of-type(2)>span::after{content:'Верно'}.course-phone .lesson-progress p:nth-of-type(3)>span::after{content:'Ошибок'}}
 @media(max-width:360px){.course-phone #coursePhoneBar{margin:0 -12px 18px;padding:10px 12px}}
 @media(max-width:700px),(max-height:500px) and (max-width:1000px) and (hover:none){.course-phone .lesson-tabs:has(#teacherTab:not([hidden])) #taskTab{display:flex}.course-phone .lesson-tabs #taskTab,.course-phone .lesson-tabs #teacherTab{justify-content:center;min-height:40px;text-align:center}.course-phone .lesson-tabs #taskTab[aria-selected=true],.course-phone .lesson-tabs #teacherTab[aria-selected=true]{background:#fff;color:#38603b;box-shadow:0 2px 6px #1c40260a}}
+
+/* Forms share space with their captions instead of competing for one line. */
+input,select,textarea,button{box-sizing:border-box;max-width:100%}
+.portal-main label:has(>input:not([type=checkbox]):not([type=radio]):not([type=range])),
+.portal-main label:has(>select),.portal-main label:has(>textarea){display:grid;grid-template-columns:minmax(0,1fr);gap:8px;min-width:0;line-height:1.6}
+.portal-main label>input:not([type=checkbox]):not([type=radio]):not([type=range]),.portal-main label>select,.portal-main label>textarea{display:block;width:100%;min-width:0;margin:0}
+.portal-main textarea{padding:12px;line-height:1.7;border:1px solid #bccdb3;border-radius:10px;resize:vertical;min-height:110px}
+.row>*:not(button),.profile-fields>*,.cohort-create>*,.student-create>*,.review-work-head>*,.roster-heading>*,.pupil-roster-card>*,.score-card-head>*{min-width:0}
+.row>input:not([type=checkbox]):not([type=radio]),.row>select{flex:1 1 210px;width:auto}
+.row>label{flex:1 1 210px}
+.portal-main .roster-filter{display:grid;gap:8px;min-width:0;flex:0 1 260px}
+.portal-main .roster-filter select{width:100%}
+.portal-main .student-create>label,.portal-main .cohort-create>label{margin:0}
+.portal-main .student-create,.portal-main .cohort-create{row-gap:16px;margin-top:18px}
+.portal-main .access-row>span,.portal-main .recipient>span{min-width:0;overflow-wrap:anywhere}
+.portal-main .access-status{white-space:normal;text-align:center;flex-shrink:0}
+.portal-main .pupil-roster-card p,.portal-main #link,.portal-main .theory-text{overflow-wrap:anywhere}
+.portal-main .workspace-nav>button,.portal-main #teacherViews>button{height:auto;min-height:46px;padding:11px 16px;white-space:normal}
+.portal-main #teacherViews{display:flex;gap:8px;flex-wrap:wrap;min-width:0}
+.portal-main #loginPanel #key{display:block;width:100%;margin:8px 0 16px}
+.portal-main #loginPanel #loginButton{width:100%}
+summary{max-width:100%;min-width:0;word-break:normal}
+summary>strong{min-width:0;overflow-wrap:anywhere}
+summary::after{flex:0 0 auto}
+.topic-menu>summary>span:not(:first-child){flex:0 0 auto;width:auto;min-width:0;height:auto;padding:0;background:transparent;white-space:nowrap;font-size:11px}
+.demo-inputs label,.demo-controls label{min-width:0}
+.demo-controls label{display:flex;align-items:center;flex-wrap:wrap;gap:8px;line-height:1.6}
+.demo-controls label select{margin:0;max-width:100%;min-width:0}
+.score-card-head{flex-wrap:wrap}
+.assembly-workspace.mobile-program-open>section:first-of-type>h3{padding-right:100px;line-height:1.5!important;min-height:44px;display:flex;align-items:center}
+@media(max-width:700px){
+ .portal-main .workspace-panel,.portal-main #app,.portal-main #details,.portal-main #cohortBody,.portal-main .review-work,.portal-main .grading-box{min-width:0;max-width:100%}
+ .portal-main .row>input:not([type=checkbox]):not([type=radio]),.portal-main .row>select,.portal-main .row>label{flex-basis:100%;width:100%}
+ .portal-main .roster-filter{flex-basis:100%;width:100%}
+ .portal-main .profile-fields,.portal-main .journal-view-controls{grid-template-columns:minmax(0,1fr)}
+ .portal-main .journal-view-controls label{min-width:0;width:100%}
+ .portal-main .cohort-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .portal-main .cohort-chip strong{font-size:16px;line-height:1.5;overflow-wrap:anywhere}
+ .portal-main label.access-row{grid-template-columns:22px minmax(0,1fr);align-items:start;gap:8px 10px}
+ .portal-main .access-row input{margin-top:2px!important}
+ .portal-main .access-row .access-status{grid-column:2;justify-self:start;max-width:100%}
+ .course-phone .topic-menu>summary>span:not(:first-child){display:block;width:auto;height:auto;background:transparent;font-size:10px}
+ .course-phone .demo-inputs label{display:block;margin:12px 0;line-height:1.6}
+ .course-phone .demo-controls{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:auto}
+ .course-phone .demo-controls button{height:auto;min-height:46px;line-height:1.5}
+ .course-phone .lesson-progress p{flex-wrap:wrap;line-height:1.5}
+ .course-phone .phone-assembly-toolbar{align-items:flex-start}.course-phone .phone-assembly-toolbar>div{min-width:0}.course-phone .phone-assembly-toolbar button{flex:0 0 auto;max-width:45%;height:auto}
+}
+@media(max-width:360px){.portal-main .cohort-grid,.portal-main .topic-score-grid{grid-template-columns:minmax(0,1fr)}}
+.portal-main button.pupil-name{background:transparent;border:0;border-radius:8px;color:#2d6144;padding:6px 0;min-height:44px;white-space:normal;overflow-wrap:anywhere}
+.portal-main button.pupil-name:hover{color:#174b32;text-decoration:underline;text-underline-offset:4px}
