@@ -10,7 +10,8 @@ for name in names:
  if name not in existing:continue
  columns=[r[1] for r in con.execute('PRAGMA table_info('+name+')')];data=con.execute('SELECT * FROM '+name).fetchall();counts[name]=len(data)
  for row in data:
-  values=[con.execute('SELECT quote(?)',(row[c],)).fetchone()[0] for c in columns]
+  # Keep every statement on one line for the dashboard's single-line console.
+  values=[con.execute('SELECT quote(?)',(row[c],)).fetchone()[0].replace('\r',"'||char(13)||'").replace('\n',"'||char(10)||'") for c in columns]
   sql.append('INSERT INTO "'+name+'"('+','.join('"'+c+'"' for c in columns)+') VALUES('+','.join(values)+');')
 if a.teacher_key_file:
  secret=Path(a.teacher_key_file).read_text().strip();digest=hashlib.sha256(secret.encode()).hexdigest();sql.append("UPDATE app_meta SET teacher_hash='"+digest+"' WHERE id=1;")
