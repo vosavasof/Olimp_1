@@ -57,3 +57,16 @@ with tempfile.TemporaryDirectory() as tmp:
  assert request('/api/bulk-assign',{'students':[sid,99999],'lessons':[5],'mode':'replace'},admin)[0]==400
  assert 35 in request('/api/me',cookie=pupil)[1]['lessons']
  print('PASS: student-only assets, classes/groups and atomic assignment validation')
+
+ manifest=request('/manifest.webmanifest')[1]
+ assert json.loads(manifest)['display']=='standalone'
+ assert request('/assets/phone.css')[0]==200
+ for size in (192,512):assert request('/assets/app-icon-'+str(size)+'.png')[1].startswith(b'\x89PNG')
+ def launch(cookie=''):
+  h=m.Handler.__new__(m.Handler);h.path='/app';h.headers={'Cookie':cookie,'Host':'school:8000'};out={}
+  h.send_response=lambda status:out.update(status=status);h.send_header=lambda k,v:out.update({k:v});h.end_headers=lambda:None
+  h.get();return out
+ assert launch()['Location']=='/student'
+ assert launch(pupil)['Location']=='/student'
+ assert launch(admin)['Location']=='/teacher'
+ print('PASS: home-screen manifest, icon assets, role-aware app launch')

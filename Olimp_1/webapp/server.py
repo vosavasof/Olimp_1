@@ -39,9 +39,9 @@ class Handler(BaseHTTPRequestHandler):
   self.send_response(status);self.send_header('Content-Type',typ);self.send_header('Content-Length',str(len(b)));self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer');self.send_header('X-Frame-Options','SAMEORIGIN')
   if cookie:self.send_header('Set-Cookie',cookie+('; Secure' if os.environ.get('OLIMP_SECURE_COOKIE')=='1' else ''))
   self.end_headers();self.wfile.write(b)
- def identity(self):
+ def identity(self,role=None):
   cookies=dict(x.strip().split('=',1) for x in self.headers.get('Cookie','').split(';') if '=' in x)
-  role=self.headers.get('X-Olimp-Role') or parse_qs(urlsplit(self.path).query).get('role',[None])[0]
+  role=role or self.headers.get('X-Olimp-Role') or parse_qs(urlsplit(self.path).query).get('role',[None])[0]
   if role not in ('teacher','student'):role='student' if urlsplit(self.path).path=='/student' else 'teacher'
   session=SESSIONS.get(cookies.get('olimp_'+role,''))
   if not session:
@@ -58,7 +58,13 @@ class Handler(BaseHTTPRequestHandler):
   except Exception:self.send(500,{'error':'Ошибка сервера. Проверьте доступ к базе данных.'})
  def get(self):
   path=urlsplit(self.path).path;s=self.identity()
-  if path in ('/assets/style.css','/assets/controls.css'):return self.send(200,(ROOT/path.rsplit('/',1)[1]).read_bytes(),'text/css; charset=utf-8')
+  if path=='/app':
+   session=self.identity('student') or self.identity('teacher');target='/student' if not session or session['role']=='student' else '/teacher'
+   self.send_response(302);self.send_header('Location',target);self.send_header('Cache-Control','no-store');self.end_headers();return
+  if path=='/manifest.webmanifest':return self.send(200,(ROOT/'manifest.webmanifest').read_bytes(),'application/manifest+json; charset=utf-8')
+  if path in ('/assets/app-icon-192.png','/assets/app-icon-512.png'):return self.send(200,(ROOT/path.rsplit('/',1)[1]).read_bytes(),'image/png')
+  if path=='/assets/app-icon.svg':return self.send(200,(ROOT/'app-icon.svg').read_bytes(),'image/svg+xml')
+  if path in ('/assets/style.css','/assets/controls.css','/assets/phone.css'):return self.send(200,(ROOT/path.rsplit('/',1)[1]).read_bytes(),'text/css; charset=utf-8')
   if path in ('/','/teacher','/student'):return self.send(200,(ROOT/'webapp/portal.html').read_bytes(),'text/html; charset=utf-8')
   if not s:return self.send(401,{'error':'Откройте персональную ссылку или войдите как учитель.'})
   with connection() as c:
