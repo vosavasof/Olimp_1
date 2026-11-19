@@ -113,3 +113,5 @@ summary::after{flex:0 0 auto}
 #activity>label[for]{display:block;line-height:1.6;margin:20px 0 8px;max-width:100%;overflow-wrap:anywhere}
 #activity>#writtenSample{display:block;width:100%;max-width:none;min-width:0;margin:0 0 12px}
 #activity>#writtenCode,#activity>#writtenReason{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;margin:0 0 20px}
+.demo-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:end;gap:12px}.demo-inputs>label{grid-column:1/-1;min-width:0}.demo-inputs>button{width:100%;height:100%;min-height:46px;margin:0}.demo-inputs input{max-width:none}
+@media(max-width:700px){.course-phone .demo-inputs{display:block}.course-phone .demo-inputs>button{height:auto;margin-top:10px}}
