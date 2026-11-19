@@ -106,3 +106,10 @@ summary::after{flex:0 0 auto}
 @media(max-width:360px){.portal-main .cohort-grid,.portal-main .topic-score-grid{grid-template-columns:minmax(0,1fr)}}
 .portal-main button.pupil-name{background:transparent;border:0;border-radius:8px;color:#2d6144;padding:6px 0;min-height:44px;white-space:normal;overflow-wrap:anywhere}
 .portal-main button.pupil-name:hover{color:#174b32;text-decoration:underline;text-underline-offset:4px}
+
+.demo-problem{margin:20px 0;padding:18px;border:1px solid #d6e4cc;border-radius:14px;background:#f5f9ef}.demo-problem h3{font-size:18px;line-height:1.5;margin:0 0 12px}.demo-problem h4{font-size:14px;margin:18px 0 6px}.demo-heading .demo-problem p{font-size:14px;line-height:1.8;margin:0}.demo-inputs>button{flex:0 1 auto;min-width:0}
+@media(max-width:700px){.course-phone .demo-problem{padding:14px}.course-phone .demo-problem h3{font-size:16px}.course-phone .demo-heading .demo-problem p{font-size:13px}.course-phone .demo-inputs>button{width:100%;margin-top:10px}}
+/* Written answers: a caption always has its own line above the field. */
+#activity>label[for]{display:block;line-height:1.6;margin:20px 0 8px;max-width:100%;overflow-wrap:anywhere}
+#activity>#writtenSample{display:block;width:100%;max-width:none;min-width:0;margin:0 0 12px}
+#activity>#writtenCode,#activity>#writtenReason{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;margin:0 0 20px}
