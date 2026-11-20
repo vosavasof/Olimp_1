@@ -28,3 +28,26 @@ html[data-theme=dark] body{background:#101c17;color:#e0ede4}
 [data-theme=dark] .access-status[data-state=open]{background:#294b34!important;color:#ceefd5!important;border-color:#6c9c78!important}
 [data-theme=dark] .access-status[data-state=mixed]{background:#493d22!important;color:#f3df9f!important;border-color:#9b874f!important}
 [data-theme=dark] :is(.old-value,.demo-controls label,.phone-goal-toggle,.topic-access-count){color:#b5cdbd!important}
+/* Text on algorithm cards must retain contrast, including inherited strong labels. */
+[data-theme=dark] :is(.cell,.number,.state-card,.prediction-state,.prediction-vars,.sample-grid>div,.test-card,.concept-hint,.phone-condition>summary,.phone-goal-toggle,.lesson-progress,.score-card-head,.score-totals,.test-result,.variable-card.changed){background:#263c2c!important;color:#e0ede4!important;border-color:#57745c!important}
+[data-theme=dark] :is(.cell,.state-card,.prediction-state,.prediction-vars,.variable-card,.demo-note,.demo-formula,.topic-score,.lesson-grade,.lesson-overview,.cohort-chip,.grading-box,.review-work,.bulk-preview) :is(p,span,small,label,code){color:#cfe3d3!important}
+[data-theme=dark] :is(.tower,.tower strong,.tower small,.demo-column strong,.demo-column .demo-index,.assembly-slot,.command,.code-slot,.code-slot select,.lesson-progress b,.grade-value,.score-totals strong){color:#e0ede4!important}
+[data-theme=dark] .cell.selected{background:#37613e!important;border-color:#a4cf9f!important}
+/* Captions occupy their own row above editable answers. */
+#activity label:has(>input:not([type=checkbox]):not([type=radio]):not([type=range])),#activity label:has(>select),#activity label:has(>textarea){display:grid;grid-template-columns:minmax(0,1fr);gap:8px;min-width:0;line-height:1.6}
+#activity label>br{display:none}#activity label>input:not([type=checkbox]):not([type=radio]):not([type=range]),#activity label>select,#activity label>textarea{min-width:0;max-width:100%;margin:0}
+#activity textarea{display:block;width:100%;box-sizing:border-box;padding:14px;border-radius:12px;line-height:1.7}
+@media(min-width:1001px){
+ :root{font-size:18px;--control-text:16px}
+ .card p,.theory-text,.text-explanation,.instruction,.option,.demo-heading .demo-problem p,.portal-main label,.portal-main section>p,.lesson-overview p,.lesson-head p{font-size:17px!important;line-height:1.85!important}
+ .lesson-links button,.topic-menu>summary strong{font-size:15px!important;line-height:1.65}
+ .mini,.portal-main small,.demo-note,.demo-formula,.lesson-progress p,.access-summary,.access-notice,.access-update{font-size:14px!important;line-height:1.75}
+ .card h3,.demo-problem h3{font-size:21px}.card h4{font-size:18px}
+ button.primary,button.secondary,button.quiet,.portal-main .workspace-nav>button,.portal-main #teacherViews>button,.portal-main .variant-toolbar button{font-size:16px!important;min-height:48px;height:auto!important;line-height:1.5!important;padding:11px 15px!important}
+ .command,.assembly-slot,.code-editor,pre,.review-code{font-size:15px!important;line-height:1.8!important}
+ .portal-main .workspace-panel{max-width:1440px}.portal-main .journal-view-controls label{min-width:min(100%,260px)}
+ .profile-fields{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+}
+@media(min-width:1600px){.card p,.theory-text,.text-explanation,.instruction,.option,.demo-heading .demo-problem p,.portal-main label,.portal-main section>p,.lesson-overview p{font-size:19px!important}.lesson-links button{font-size:16px!important}}
+.lesson-links button[data-open]{display:grid!important;grid-template-columns:20px minmax(0,1fr);align-items:start;gap:8px}.lesson-links button[data-open]>b{grid-column:1;min-width:0}.lesson-links button[data-open]>.nav-access-status{grid-column:2;margin-left:0}
+@media(min-width:1001px){aside{width:320px}body:not(.has-phone-app)>main:not(.portal-main){margin-left:320px;width:calc(100% - 320px)}.lesson-head h2,#theoryPanel>h2{font-size:27px}}
