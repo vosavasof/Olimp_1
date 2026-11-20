@@ -28,11 +28,11 @@ try {
   let roster=(await request('students',undefined,teacher)).value;
   assert.equal(roster.find(p=>p.id===pupil.id).lifecycle,'archived');
   assert.deepEqual(roster.find(p=>p.id===pupil.id).lessons,[0,1]);
-  assert.equal((await request('journal',undefined,teacher)).value[0].score,1);
+  assert.equal((await request('journal',undefined,teacher)).value.length,0,'archived pupils must be absent from journal');assert.equal((await request('journal-delta?after=0&reviewed_after=0',undefined,teacher)).value.rows.length,0);assert.equal((await request('student/'+pupil.id,undefined,teacher)).value.attempts[0].score,1,'archived records remain in pupil profile');
   assert.equal((await request('access',{students:[other.id,pupil.id],changes:[{lesson:2,open:true}]},teacher)).status,400);
   assert(!((await request('students',undefined,teacher)).value.find(p=>p.id===other.id).lessons.includes(2)),'invalid recipients must not partly change access');
   await request('lifecycle',{entity:'student',id:pupil.id,action:'remove'},teacher);
-  assert.equal((await request('students',undefined,teacher)).value.find(p=>p.id===pupil.id).lifecycle,'removed');
+  assert.equal((await request('students',undefined,teacher)).value.find(p=>p.id===pupil.id).lifecycle,'removed');assert.equal((await request('journal',undefined,teacher)).value.length,0,'removed pupils must be absent from journal');
   await request('lifecycle',{entity:'student',id:pupil.id,action:'restore'},teacher);
   assert.equal((await request('me',undefined,child,'student')).status,401,'old session must remain revoked after restore');
   child=(await request('login',{key:pupil.link.split('#')[1]})).cookie;
