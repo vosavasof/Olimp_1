@@ -17,5 +17,14 @@ html[data-theme=dark] body{background:#101c17;color:#e0ede4}
 [data-theme=dark] .demo-stage{background:#152a27}[data-theme=dark] .demo-index{color:#c4dacb}[data-theme=dark] .demo-bar{color:#fff}[data-theme=dark] .demo-source .executing{background:#31573a;color:#fff}[data-theme=dark] a{color:#94d5a6}[data-theme=dark] ::placeholder{color:#94ac9c;opacity:1}[data-theme=dark] .phone-bottom-nav{box-shadow:0 -1px 0 #425548}[data-theme=dark] :focus-visible{outline-color:#9bd7a6}[data-theme=dark] ::selection{background:#46744c;color:#fff}
 
 [data-theme=dark] .brand span,[data-theme=dark] .lesson-links button{color:#bed7c4!important}[data-theme=dark] .lesson-links button b{color:#98c58e}[data-theme=dark] .topic-menu>summary>span{background:#34583b!important;color:#e0ede4!important}
-@media(max-width:700px){.phone-header{grid-template-columns:36px minmax(0,1fr) 44px 44px!important}.phone-header .theme-toggle{width:44px;height:44px;min-height:44px;padding:0;font-size:0!important;margin:0;max-width:44px}.phone-header .theme-toggle::before{content:'☾';font-size:22px}[data-theme=dark] .phone-header .theme-toggle::before{content:'☀'}}
+@media(max-width:700px), (max-height:500px) and (max-width:1000px) and (hover:none){.phone-header{grid-template-columns:36px minmax(0,1fr) 44px 44px!important}.phone-header .theme-toggle{width:44px;height:44px;min-height:44px;padding:0;font-size:0!important;margin:0;max-width:44px}.phone-header .theme-toggle::before{content:'☾';font-size:22px}[data-theme=dark] .phone-header .theme-toggle::before{content:'☀'}}
 [data-theme=dark] :is(#phoneMenuButton,#openCoursePicker,.phone-sheet-heading button){background:#20382a!important;color:#d6ebdc!important;border-color:#4a6651!important}
+
+/* Keep helper panels, statuses and code markers readable in dark mode. */
+[data-theme=dark] :is(.bulk-preview,.access-notice,.access-summary,.access-update,.phone-score-stats>div,.phone-assembly-intro,.lesson-locked,.queue-empty){background:#263c2c!important;color:#d0e5d3!important;border-color:#4e6b51!important}
+[data-theme=dark] .has-phone-app #app>section:nth-child(2)>p{background:#263c2c!important;color:#c2d8c5!important;border-color:#4e6b51!important}
+[data-theme=dark] :is(.error,.feedback.mistake){color:#ffc4b5!important;background:#422a24!important;border-color:#a46c5b!important}
+[data-theme=dark] :is(.feedback.good,#bulkStatus,#reviewQueueSaved){color:#b5edc4!important}
+[data-theme=dark] .access-status[data-state=open]{background:#294b34!important;color:#ceefd5!important;border-color:#6c9c78!important}
+[data-theme=dark] .access-status[data-state=mixed]{background:#493d22!important;color:#f3df9f!important;border-color:#9b874f!important}
+[data-theme=dark] :is(.old-value,.demo-controls label,.phone-goal-toggle,.topic-access-count){color:#b5cdbd!important}
