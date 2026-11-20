@@ -79,3 +79,11 @@ html[data-theme=dark] body{background:#101c17;color:#e0ede4}
 [data-theme=dark] :is(.tag,.review-badge){background:#243c2b!important;color:#c1d7c4!important;border-color:#3c5942!important}
 [data-theme=dark] :is(.demo-bar,.is-visited .demo-bar){background:#315542;color:#e5f1e8}[data-theme=dark] .is-current .demo-bar{background:#46785a;color:#fff}
 [data-theme=dark] button:focus-visible,[data-theme=dark] input:focus-visible,[data-theme=dark] select:focus-visible,[data-theme=dark] textarea:focus-visible{outline:none;box-shadow:inset 0 0 0 2px #8ab594!important}
+/* Paint the root canvas too: short pages and Safari overscroll stay dark. */
+html[data-theme=dark]{background:#101c17!important;min-height:100%}
+html[data-theme=dark] body{min-height:100vh;min-height:100dvh;background:#101c17!important}
+[data-theme=dark] body:not(.has-phone-app)>.portal-main{min-height:100vh;min-height:100dvh}
+[data-theme=dark] .topic-menu .lesson-links button:hover,[data-theme=dark] .topic-menu .lesson-links button:focus-visible{background:#294532!important;color:#e5f0e7!important;border-color:#52765a!important}
+[data-theme=dark] .topic-menu .lesson-links button.active,[data-theme=dark] .topic-menu .lesson-links button[aria-current=step],[data-theme=dark] .topic-menu .lesson-links button[aria-current=page]{background:#30543c!important;color:#edf5ef!important;box-shadow:inset 3px 0 #8db89a!important}
+[data-theme=dark] .topic-menu .lesson-links button:hover>b,[data-theme=dark] .topic-menu .lesson-links button:focus-visible>b{color:#b6d7b1!important}
+[data-theme=dark] .topic-menu .lesson-links button:hover .nav-access-status,[data-theme=dark] .topic-menu .lesson-links button:focus-visible .nav-access-status{color:#c0d5c5!important}
